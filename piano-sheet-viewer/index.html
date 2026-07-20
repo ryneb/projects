@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Key-Aware Sheet Music Viewer</title>
+<style>
+  :root {
+    --paper:#F4F1EB; --panel:#FBFAF6; --panel-2:#EFEBE1;
+    --ink:#1B1B20; --muted:#6C6A62; --line:#E1DBCF;
+    --sharp:#2F6BAE; --sharp-bg:#DEEAF6; --flat:#B0662A; --flat-bg:#F3E6D4;
+    --brass:#9A7A32; --stave:#413E36;
+    --shadow:0 1px 2px rgba(30,25,15,.06),0 8px 24px rgba(30,25,15,.06);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --music:"Bravura","Leland","Noto Music","Segoe UI Symbol","Apple Symbols",serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#151519;--panel:#1E1E23;--panel-2:#26262C;--ink:#ECEAE1;--muted:#9D9B90;
+      --line:#2F2F36;--sharp:#77ADE4;--sharp-bg:#1C3350;--flat:#E1A25E;--flat-bg:#43331F;
+      --brass:#D3AC5B;--stave:#B7B3A6;--shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);}
+  }
+  :root[data-theme="light"]{--paper:#F4F1EB;--panel:#FBFAF6;--panel-2:#EFEBE1;--ink:#1B1B20;--muted:#6C6A62;
+    --line:#E1DBCF;--sharp:#2F6BAE;--sharp-bg:#DEEAF6;--flat:#B0662A;--flat-bg:#F3E6D4;--brass:#9A7A32;--stave:#413E36;
+    --shadow:0 1px 2px rgba(30,25,15,.06),0 8px 24px rgba(30,25,15,.06);}
+  :root[data-theme="dark"]{--paper:#151519;--panel:#1E1E23;--panel-2:#26262C;--ink:#ECEAE1;--muted:#9D9B90;
+    --line:#2F2F36;--sharp:#77ADE4;--sharp-bg:#1C3350;--flat:#E1A25E;--flat-bg:#43331F;--brass:#D3AC5B;--stave:#B7B3A6;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);}
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1000px;margin:0 auto;padding:clamp(20px,4vw,52px) clamp(16px,4vw,32px) 72px;}
+
+  header .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass);font-weight:600;margin:0 0 10px;}
+  header h1{font-family:var(--serif);font-weight:600;font-size:clamp(28px,5vw,46px);line-height:1.06;margin:0 0 14px;text-wrap:balance;letter-spacing:-.01em;}
+  header h1 .s{color:var(--sharp);} header h1 .f{color:var(--flat);}
+  header p.lede{margin:0;max-width:64ch;color:var(--muted);font-size:clamp(15px,2vw,17px);}
+
+  .board{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;}
+  .toolbar{display:flex;flex-wrap:wrap;gap:16px 22px;align-items:flex-end;padding:18px 20px;border-bottom:1px solid var(--line);background:var(--panel-2);}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+  select,input[type=text]{font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--panel);
+    border:1px solid var(--line);border-radius:9px;padding:8px 11px;min-height:38px;}
+  input#keyInput{width:110px;font-family:var(--mono);font-weight:600;}
+  select{min-width:190px;cursor:pointer;}
+  .toggles{display:flex;gap:16px;align-items:center;margin-left:auto;}
+  .switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer;user-select:none;}
+  .switch input{accent-color:var(--brass);width:16px;height:16px;cursor:pointer;}
+
+  .keybar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);}
+  .keybar .kname{font-family:var(--serif);font-size:19px;font-weight:600;}
+  .keybar .chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{font-family:var(--mono);font-size:13px;font-weight:600;padding:4px 9px;border-radius:7px;border:1px solid transparent;}
+  .chip.s{background:var(--sharp-bg);color:var(--sharp);border-color:color-mix(in srgb,var(--sharp) 30%,transparent);}
+  .chip.f{background:var(--flat-bg);color:var(--flat);border-color:color-mix(in srgb,var(--flat) 30%,transparent);}
+  .chip.none{background:var(--panel-2);color:var(--muted);font-family:var(--sans);}
+  .keybar .say{color:var(--muted);font-size:13.5px;flex:1;min-width:220px;}
+  .keybar .say b{color:var(--ink);font-weight:600;}
+  .keybar .stat{font-family:var(--mono);font-size:12.5px;color:var(--muted);white-space:nowrap;}
+  .keybar .stat b{color:var(--brass);}
+
+  .score-wrap{padding:22px 18px 8px;overflow-x:auto;}
+  #score{display:block;min-width:520px;margin:0 auto;}
+  #score text.mus{font-family:var(--music);}
+  .titleline{padding:0 22px;margin:6px 0 0;}
+  .titleline .tt{font-family:var(--serif);font-size:18px;font-weight:600;}
+  .titleline .mm{color:var(--muted);font-size:13px;font-family:var(--mono);margin-left:10px;}
+  .parse-msg{padding:6px 22px 16px;color:var(--flat);font-size:13px;font-family:var(--mono);}
+
+  .lower{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;}
+  @media (max-width:720px){.lower{grid-template-columns:1fr;}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 20px 20px;box-shadow:var(--shadow);}
+  .card h3{font-family:var(--serif);font-size:16px;margin:0 0 10px;}
+  .card label{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:600;display:block;margin-bottom:6px;}
+  textarea#abc{width:100%;min-height:150px;resize:vertical;font-family:var(--mono);font-size:13px;line-height:1.5;
+    color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;}
+  .hint{font-size:12.5px;color:var(--muted);margin:10px 0 0;}
+  .hint code{font-family:var(--mono);background:var(--panel-2);padding:1px 5px;border-radius:4px;font-size:12px;}
+  .legend{display:flex;flex-direction:column;gap:11px;font-size:13.5px;}
+  .legend .row{display:flex;gap:11px;align-items:flex-start;}
+  .swatch{flex:none;width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--music);font-size:15px;font-weight:700;margin-top:1px;}
+  .swatch.s{background:var(--sharp-bg);color:var(--sharp);} .swatch.f{background:var(--flat-bg);color:var(--flat);}
+  .swatch.n{background:var(--panel-2);color:var(--ink);} .swatch.badge{background:transparent;border:1.5px dashed var(--brass);color:var(--brass);}
+  .legend .row b{color:var(--ink);} .legend .row span{color:var(--muted);}
+
+  footer{margin-top:52px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px;text-align:center;}
+  a{color:var(--brass);}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Piano · Reading in any key</p>
+    <h1>See every <span class="s">sharp</span> and <span class="f">flat</span> before you play it</h1>
+    <p class="lede">Paste a tune or pick one below. The viewer engraves it and colors every note the key silently alters — the F that's really an F♯, the B that's really a B♭ — with a small reminder mark above each one. No more discovering the accidental with your finger already down.</p>
+  </header>
+
+  <div class="board">
+    <div class="toolbar">
+      <div class="field">
+        <label for="tuneSel">Tune</label>
+        <select id="tuneSel"></select>
+      </div>
+      <div class="field">
+        <label for="keyInput">Key</label>
+        <input type="text" id="keyInput" spellcheck="false" aria-label="Key signature">
+      </div>
+      <div class="toggles">
+        <label class="switch"><input type="checkbox" id="tgBadge" checked> Reminder marks</label>
+        <label class="switch"><input type="checkbox" id="tgColorAll"> Color written accidentals too</label>
+      </div>
+    </div>
+
+    <div class="keybar">
+      <span class="kname" id="kname">C major</span>
+      <span class="chips" id="kchips"></span>
+      <span class="say" id="ksay"></span>
+      <span class="stat" id="kstat"></span>
+    </div>
+
+    <p class="titleline" id="titleline"></p>
+    <div class="score-wrap"><svg id="score" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div class="parse-msg" id="parseMsg"></div>
+  </div>
+
+  <div class="lower">
+    <div class="card">
+      <h3>Your music</h3>
+      <label for="abc">ABC notation — edit freely, the score updates live</label>
+      <textarea id="abc" spellcheck="false"></textarea>
+      <p class="hint">ABC is a compact text format for tunes. Notes are letters <code>A</code>–<code>G</code> (and <code>a</code>–<code>g</code> an octave up); <code>,</code> / <code>'</code> shift octaves; set the key with <code>K:</code>. Thousands of free tunes exist online in this format — paste one in.</p>
+    </div>
+    <div class="card">
+      <h3>What the colors mean</h3>
+      <div class="legend">
+        <div class="row"><span class="swatch f">♭</span><div><b>Amber = flat.</b> <span>The key lowers this note. Every B in F major sounds B♭.</span></div></div>
+        <div class="row"><span class="swatch s">♯</span><div><b>Blue = sharp.</b> <span>The key raises this note. Every F in D major sounds F♯.</span></div></div>
+        <div class="row"><span class="swatch badge">♯</span><div><b>Reminder mark.</b> <span>Floats above notes the key alters that carry no written symbol — the ones easy to forget.</span></div></div>
+        <div class="row"><span class="swatch n">♮</span><div><b>Ink = play as written.</b> <span>Natural notes, and any note a written ♮ cancels back, stay in the default color.</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Ebony &amp; ivory · a key-aware reader. Companion to the <a href="../piano-key-signatures/index.html">key-signature trainer</a>.
+    Hover a colored note to see what it really sounds.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var SHARP_ORDER=["F","C","G","D","A","E","B"];
+  var FLAT_ORDER =["B","E","A","D","G","C","F"];
+  var LETTER_IDX={C:0,D:1,E:2,F:3,G:4,A:5,B:6};
+
+  var KEYSIG={
+    "C":{t:"n",n:0},"G":{t:"s",n:1},"D":{t:"s",n:2},"A":{t:"s",n:3},"E":{t:"s",n:4},"B":{t:"s",n:5},"F#":{t:"s",n:6},"C#":{t:"s",n:7},
+    "F":{t:"f",n:1},"Bb":{t:"f",n:2},"Eb":{t:"f",n:3},"Ab":{t:"f",n:4},"Db":{t:"f",n:5},"Gb":{t:"f",n:6},"Cb":{t:"f",n:7},
+    "Am":{t:"n",n:0},"Em":{t:"s",n:1},"Bm":{t:"s",n:2},"F#m":{t:"s",n:3},"C#m":{t:"s",n:4},"G#m":{t:"s",n:5},"D#m":{t:"s",n:6},"A#m":{t:"s",n:7},
+    "Dm":{t:"f",n:1},"Gm":{t:"f",n:2},"Cm":{t:"f",n:3},"Fm":{t:"f",n:4},"Bbm":{t:"f",n:5},"Ebm":{t:"f",n:6},"Abm":{t:"f",n:7}
+  };
+
+  function parseKey(raw){
+    if(raw==null) raw="C";
+    var s=String(raw).trim().replace(/\s+/g,"");
+    if(s==="") s="C";
+    var m=s.match(/^([A-Ga-g])([#b]?)(.*)$/);
+    if(!m) return mk("C","C major");
+    var letter=m[1].toUpperCase(), acc=m[2], rest=m[3].toLowerCase();
+    var minor=/^(m|min|minor|aeo)/.test(rest) && !/^ma/.test(rest);
+    var name=letter+acc+(minor?"m":"");
+    if(KEYSIG[name]) return mk(name, letter+acc+(minor?" minor":" major"));
+    // unknown -> treat as natural of that letter (no signature)
+    return mk(letter+acc, letter+acc+(minor?" minor":" major"), {t:"n",n:0});
+    function mk(nm,disp,forceSig){ var sig=forceSig||KEYSIG[nm]||{t:"n",n:0}; return {name:nm,display:disp,t:sig.t,n:sig.n}; }
+  }
+  function keyLetters(k){ return k.t==="s"?SHARP_ORDER.slice(0,k.n):k.t==="f"?FLAT_ORDER.slice(0,k.n):[]; }
+  function keyAlt(k,letter){ if(keyLetters(k).indexOf(letter)>=0) return k.t==="s"?"sharp":"flat"; return null; }
+
+  // ---------- ABC parsing ----------
+  function parseTune(abc){
+    var lines=String(abc).replace(/\r/g,"").split("\n");
+    var title="",meter="",Lf="",keyRaw="C",sawK=false,body=[];
+    for(var i=0;i<lines.length;i++){
+      var ln=lines[i];
+      var hm=ln.match(/^([A-Za-z]):(.*)$/);
+      if(hm && !sawK){
+        var f=hm[1], v=hm[2].trim();
+        if(f==="T"&&!title) title=v;
+        else if(f==="M") meter=v;
+        else if(f==="L") Lf=v;
+        else if(f==="K"){ keyRaw=v; sawK=true; }
+        continue;
+      }
+      if(hm && sawK) continue;          // info field inside body (w:, N:, etc.)
+      if(ln.trim()==="") continue;
+      if(ln.charAt(0)==="%") continue;
+      body.push(ln);
+    }
+    var L=parseL(Lf,meter);
+    var key=parseKey(keyRaw);
+    var elements=tokenize(body.join("\n"));
+    return {title:title,meter:meter,L:L,key:key,elements:elements};
+  }
+
+  function parseL(Lf,meter){
+    var mm=String(Lf).match(/(\d+)\s*\/\s*(\d+)/);
+    if(mm) return {num:+mm[1],den:+mm[2]};
+    var val=meterVal(meter);
+    return (val!=null && val<0.75)?{num:1,den:8}:{num:1,den:4};
+  }
+  function meterVal(meter){
+    var s=String(meter).trim();
+    if(s==="C") return 1; if(s==="C|") return 1;
+    var m=s.match(/(\d+)\s*\/\s*(\d+)/); if(m) return (+m[1])/(+m[2]); return null;
+  }
+
+  function tokenize(src){
+    var el=[], i=0, n=src.length;
+    function readDur(j){
+      var num="",given=false;
+      while(j<n && /[0-9]/.test(src[j])){num+=src[j++];}
+      var d=num?parseInt(num,10):1; if(num)given=true;
+      while(src[j]==="/"){ j++; var dn=""; while(j<n&&/[0-9]/.test(src[j])){dn+=src[j++];} d=d/(dn?parseInt(dn,10):2); given=true; }
+      return {dur:d,i:j,given:given};
+    }
+    function readNote(j){
+      var acc=null, am=src.slice(j,j+2);
+      if(am==="^^"){acc="dsharp";j+=2;} else if(am==="__"){acc="dflat";j+=2;}
+      else { var c1=src[j]; if(c1==="^"){acc="sharp";j++;} else if(c1==="_"){acc="flat";j++;} else if(c1==="="){acc="natural";j++;} }
+      var lm=src[j];
+      if(!lm||!/[A-Ga-g]/.test(lm)) return null;
+      var letter=lm.toUpperCase(), octave=/[a-g]/.test(lm)?5:4; j++;
+      while(src[j]===","||src[j]==="'"){ if(src[j]===",")octave--; else octave++; j++; }
+      var d=readDur(j); j=d.i;
+      return {note:{letter:letter,octave:octave,accidental:acc,dur:d.dur}, i:j};
+    }
+    while(i<n){
+      var c=src[i];
+      if(c===" "||c==="\t"||c==="\n"){ i++; continue; }
+      if(c==="%"){ while(i<n&&src[i]!=="\n")i++; continue; }
+      if(c==='"'){ i++; while(i<n&&src[i]!=='"')i++; i++; continue; }
+      if(c==="!"){ i++; while(i<n&&src[i]!=="!")i++; i++; continue; }
+      if(c==="{"){ i++; while(i<n&&src[i]!=="}")i++; i++; continue; }
+      if(c==="("||c===")"){ i++; continue; }
+      if(c==="-"||c===">"||c==="<"||c==="*"){ i++; continue; }
+      if(c==="|"){ i++; if(src[i]===":"||src[i]==="]"||src[i]==="|")i++; el.push({type:"bar"}); continue; }
+      if(c===":"){ i++; if(src[i]==="|")i++; el.push({type:"bar"}); continue; }
+      if(c==="["){
+        if(/[A-Za-z]/.test(src[i+1]||"") && src[i+2]===":"){
+          var f=src[i+1]; i+=3; var v=""; while(i<n&&src[i]!=="]"){v+=src[i++];} i++;
+          if(f==="K") el.push({type:"key",key:v.trim()});
+          continue;
+        }
+        i++; var cn=[];
+        while(i<n&&src[i]!=="]"){ var rr=readNote(i); if(rr){cn.push(rr.note);i=rr.i;} else i++; }
+        i++; var cd=readDur(i); i=cd.i;
+        if(cn.length){ for(var q=0;q<cn.length;q++){ if(cd.given) cn[q].dur=cd.dur; } el.push({type:"chord",notes:cn,dur:cd.dur}); }
+        continue;
+      }
+      if(c==="z"||c==="x"){ i++; var rd=readDur(i); i=rd.i; el.push({type:"rest",dur:rd.dur}); continue; }
+      if(c==="Z"||c==="X"){ i++; var rd2=readDur(i); i=rd2.i; el.push({type:"rest",dur:(rd2.given?rd2.dur:1)*4}); continue; }
+      if(c==="y"){ i++; readDur(i); continue; }
+      var rn=readNote(i);
+      if(rn){ el.push({type:"note",note:rn.note}); i=rn.i; continue; }
+      i++; // unknown -> skip
+    }
+    return el;
+  }
+
+  // ---------- annotate accidentals ----------
+  function annotate(elements,key){
+    var measureAcc={}, curKey=key, implied=0;
+    for(var i=0;i<elements.length;i++){
+      var e=elements[i];
+      if(e.type==="bar"){ measureAcc={}; continue; }
+      if(e.type==="key"){ curKey=parseKey(e.key); continue; }
+      var notes=e.type==="chord"?e.notes:e.type==="note"?[e.note]:[];
+      for(var k=0;k<notes.length;k++){
+        var nt=notes[k], LO=nt.letter+nt.octave, eff, keyImplied=false, explicit=false;
+        if(nt.accidental){ eff=nt.accidental; measureAcc[LO]=nt.accidental; explicit=true; }
+        else if(LO in measureAcc){ eff=measureAcc[LO]; }
+        else { var ka=keyAlt(curKey,nt.letter); if(ka){ eff=ka; keyImplied=true; } else eff="natural"; }
+        nt.eff=eff;
+        nt.color=(eff==="sharp"||eff==="dsharp")?"s":(eff==="flat"||eff==="dflat")?"f":"n";
+        nt.keyImplied=keyImplied; nt.explicit=explicit;
+        if(keyImplied) implied++;
+      }
+    }
+    return {implied:implied};
+  }
+
+  // ---------- rendering ----------
+  var LS=13, RX=LS*0.66, RY=LS*0.50, W=900, MARGIN=26;
+  var SVGNS="http://www.w3.org/2000/svg";
+
+  function di(letter,octave){ return octave*7+LETTER_IDX[letter]; }
+  // staff line dis: 30(E4)32(G4)34(B4)36(D5)38(F5). top line F5=38.
+  function yFor(staffTop,d){ return staffTop+(38-d)*(LS/2); }
+
+  var ACC_GLYPH={sharp:"♯",flat:"♭",natural:"♮",dsharp:"♯",dflat:"♭"};
+
+  // sharp key signature positions (di) in treble, in order F C G D A E B
+  var SHARP_POS=[38,35,39,36,33,37,34];
+  var FLAT_POS =[34,37,33,36,32,35,31];
+
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function svgEl(tag,attrs,inner){
+    var s="<"+tag; for(var k in attrs){ if(attrs[k]!==null&&attrs[k]!==undefined) s+=" "+k+'="'+attrs[k]+'"'; }
+    s+=inner!==undefined?">"+inner+"</"+tag+">":"/>"; return s;
+  }
+  function colorVar(c){ return c==="s"?"var(--sharp)":c==="f"?"var(--flat)":"var(--ink)"; }
+
+  function quarterLen(dur,L){ return dur*(L.num/L.den)*4; }
+  function noteStyle(ql){
+    if(ql>=4) return {open:true,stem:false,flags:0};
+    if(ql>=2) return {open:true,stem:true,flags:0};
+    if(ql>=0.9) return {open:false,stem:true,flags:0};
+    if(ql>=0.4) return {open:false,stem:true,flags:1};
+    return {open:false,stem:true,flags:2};
+  }
+
+  function elWidth(e,L){
+    if(e.type==="bar") return 16;
+    if(e.type==="key") return 0;
+    var dur=e.type==="chord"?e.dur:e.note?e.note.dur:1;
+    var ql=quarterLen(dur||1,L);
+    return 26+9*Math.min(Math.max(ql,0.5),4);
+  }
+
+  function render(tune,opts){
+    var svg=document.getElementById("score");
+    var elements=tune.elements, L=tune.L;
+    // group into measures (keep bars as measure terminators)
+    var prefixW=54+ (tune.key.n>0? tune.key.n*(tune.key.t==="s"?9:8)+8 : 4);
+    var systemW=W-2*MARGIN-prefixW;
+
+    // build measures
+    var measures=[], cur={els:[],w:0};
+    for(var i=0;i<elements.length;i++){
+      var e=elements[i];
+      if(e.type==="key"){ cur.els.push(e); continue; }
+      cur.els.push(e); cur.w+=elWidth(e,L);
+      if(e.type==="bar"){ measures.push(cur); cur={els:[],w:0}; }
+    }
+    if(cur.els.length) measures.push(cur);
+
+    // pack measures into systems
+    var systems=[], sys={measures:[],w:0};
+    for(var m=0;m<measures.length;m++){
+      var mw=measures[m].w;
+      if(sys.measures.length>0 && sys.w+mw>systemW){ systems.push(sys); sys={measures:[],w:0}; }
+      sys.measures.push(measures[m]); sys.w+=mw;
+    }
+    if(sys.measures.length) systems.push(sys);
+    if(systems.length===0) systems.push({measures:[],w:0});
+
+    var rowH=9*LS, topPad=LS*3.2, botPad=LS*2;
+    var totalH=topPad+systems.length*rowH+botPad;
+    svg.setAttribute("viewBox","0 0 "+W+" "+totalH);
+    svg.setAttribute("width","100%"); svg.setAttribute("height",totalH);
+    svg.setAttribute("role","img");
+    svg.setAttribute("aria-label","Engraved score with key accidentals highlighted");
+
+    var out="";
+    for(var s=0;s<systems.length;s++){
+      var staffTop=topPad+s*rowH+LS; // top line y
+      out+=renderSystem(systems[s],staffTop,tune.key,L,opts,systemW,prefixW);
+    }
+    svg.innerHTML=out;
+  }
+
+  function renderSystem(system,staffTop,key,L,opts,systemW,prefixW){
+    var x0=MARGIN, x1=W-MARGIN, out="";
+    // staff lines
+    for(var ln=0;ln<5;ln++){
+      var y=staffTop+ln*LS;
+      out+=svgEl("line",{x1:x0,y1:y,x2:x1,y2:y,stroke:"var(--stave)","stroke-width":1});
+    }
+    // clef
+    out+=svgEl("text",{x:x0+18,y:staffTop+3*LS+2,"text-anchor":"middle","dominant-baseline":"alphabetic",
+      "class":"mus","font-size":LS*4.4,fill:"var(--ink)"}, "𝄞");
+    // key signature
+    var kx=x0+40;
+    if(key.n>0){
+      var pos=key.t==="s"?SHARP_POS:FLAT_POS;
+      var glyph=key.t==="s"?"♯":"♭";
+      var col=key.t==="s"?"var(--sharp)":"var(--flat)";
+      var step=key.t==="s"?9:8;
+      for(var a=0;a<key.n;a++){
+        var yy=yFor(staffTop,pos[a]) + (key.t==="f"?LS*0.28:0);
+        out+=svgEl("text",{x:kx,y:yy,"text-anchor":"middle","dominant-baseline":"middle","class":"mus",
+          "font-size":LS*1.9,fill:col,"font-weight":"600"},glyph);
+        kx+=step;
+      }
+      kx+=6;
+    } else { kx+=8; }
+
+    // notes: scale available width across measures
+    var contentStart=kx, avail=x1-contentStart-8;
+    var rawW=0; for(var mi=0;mi<system.measures.length;mi++) rawW+=system.measures[mi].w;
+    var scale=rawW>0?Math.min(1.35, avail/rawW):1;
+    if(!isFinite(scale)||scale<=0) scale=1;
+
+    var x=contentStart;
+    for(var mm=0;mm<system.measures.length;mm++){
+      var meas=system.measures[mm];
+      for(var ei=0;ei<meas.els.length;ei++){
+        var e=meas.els[ei];
+        if(e.type==="key") continue;
+        var w=elWidth(e,L)*scale;
+        if(e.type==="bar"){
+          out+=svgEl("line",{x1:x+w*0.5,y1:staffTop,x2:x+w*0.5,y2:staffTop+4*LS,stroke:"var(--stave)","stroke-width":1.3});
+          x+=w; continue;
+        }
+        if(e.type==="rest"){
+          out+=drawRest(x+w*0.5,staffTop,quarterLen(e.dur,L));
+          x+=w; continue;
+        }
+        var notes=e.type==="chord"?e.notes:[e.note];
+        var dur=e.type==="chord"?e.dur:e.note.dur;
+        out+=drawNoteGroup(notes,x+w*0.5,staffTop,quarterLen(dur,L),key,opts);
+        x+=w;
+      }
+    }
+    return out;
+  }
+
+  function drawRest(cx,staffTop,ql){
+    var yc=staffTop+2*LS;
+    var h=ql>=4?LS*0.7:ql>=2?LS*0.6:LS*1.3;
+    if(ql>=2){ // whole/half: block hanging from / sitting on a line
+      var yb=ql>=4?staffTop+1*LS:staffTop+2*LS;
+      return svgEl("rect",{x:cx-LS*0.5,y:ql>=4?yb-LS*0.42:yb,width:LS,height:LS*0.42,fill:"var(--muted)",rx:1});
+    }
+    // quarter/eighth rest: simple mark
+    return svgEl("rect",{x:cx-LS*0.16,y:yc-LS*0.9,width:LS*0.32,height:LS*1.8,fill:"var(--muted)",rx:2,opacity:.75,transform:"skewX(-12 "+cx+" "+yc+")"});
+  }
+
+  function drawNoteGroup(notes,cx,staffTop,ql,key,opts){
+    var st=noteStyle(ql), out="", g="";
+    // determine stem dir from average di
+    var sumdi=0; for(var i=0;i<notes.length;i++) sumdi+=di(notes[i].letter,notes[i].octave);
+    var avg=sumdi/notes.length;
+    var stemUp=avg<34; // below middle line -> up
+
+    for(var k=0;k<notes.length;k++){
+      var nt=notes[k], d=di(nt.letter,nt.octave), y=yFor(staffTop,d);
+      var col=colorVar(nt.color);
+      var showColor = nt.keyImplied || (nt.explicit && opts.colorAll) || (nt.color!=="n" && !nt.explicit);
+      var fillCol = (nt.color!=="n" && showColor)?col:"var(--ink)";
+      // ledger lines
+      if(d>=40){ for(var dd=40;dd<=d;dd+=2) out+=ledger(cx,yFor(staffTop,dd)); }
+      if(d<=28){ for(var db=28;db>=d;db-=2) out+=ledger(cx,yFor(staffTop,db)); }
+      // notehead
+      var head;
+      if(st.open){
+        head=svgEl("ellipse",{cx:cx,cy:y,rx:RX,ry:RY,fill:"var(--panel)",stroke:fillCol,"stroke-width":2.3,
+          transform:"rotate(-18 "+cx+" "+y+")"});
+      } else {
+        head=svgEl("ellipse",{cx:cx,cy:y,rx:RX,ry:RY,fill:fillCol,transform:"rotate(-18 "+cx+" "+y+")"});
+      }
+      // written accidental symbol (to the left)
+      var accSym="";
+      if(nt.explicit){
+        accSym=svgEl("text",{x:cx-RX-6,y:y,"text-anchor":"middle","dominant-baseline":"middle","class":"mus",
+          "font-size":LS*1.7,fill:(opts.colorAll&&nt.color!=="n")?col:"var(--ink)","font-weight":"600"},ACC_GLYPH[nt.eff]||"");
+      }
+      // reminder badge above (key-implied only)
+      var badge="";
+      if(nt.keyImplied && opts.badge){
+        var by=Math.min(y-LS*1.5, staffTop-LS*0.9);
+        badge=svgEl("circle",{cx:cx,cy:by,r:LS*0.72,fill:nt.color==="s"?"var(--sharp-bg)":"var(--flat-bg)",
+          stroke:col,"stroke-width":1,"stroke-dasharray":"2 1.6"})+
+          svgEl("text",{x:cx,y:by+0.5,"text-anchor":"middle","dominant-baseline":"middle","class":"mus",
+            "font-size":LS*1.15,fill:col,"font-weight":"700"},nt.color==="s"?"♯":"♭");
+      }
+      // tooltip
+      var oct=nt.octave, mark=oct<4?" (low)":oct>5?" (high)":"";
+      var sounds=nt.letter+(nt.eff==="sharp"?"♯":nt.eff==="flat"?"♭":nt.eff==="dsharp"?"×":nt.eff==="dflat"?"♭♭":"");
+      var tip=nt.letter+" → sounds "+sounds+(nt.keyImplied?"  ("+key.display+" says so)":nt.explicit?"  (written)":"");
+      out+=svgEl("g",{},svgEl("title",{},esc(tip))+accSym+head+badge);
+      // stems belong to the outer group (drawn once); collect extreme y for stem
+      nt._y=y;
+    }
+    // stem + flags (single, from outermost note)
+    if(st.stem){
+      var ys=notes.map(function(nt){return nt._y;});
+      var yTop=Math.min.apply(null,ys), yBot=Math.max.apply(null,ys);
+      var sx=stemUp?cx+RX*0.92:cx-RX*0.92;
+      var y1=stemUp?yBot:yTop;
+      var y2=stemUp?yTop-LS*3.3:yBot+LS*3.3;
+      out+=svgEl("line",{x1:sx,y1:y1,x2:sx,y2:y2,stroke:"var(--ink)","stroke-width":1.7});
+      for(var fl=0;fl<st.flags;fl++){
+        var fy=y2+(stemUp?1:-1)*fl*LS*0.85;
+        out+=flag(sx,fy,stemUp);
+      }
+    }
+    return out;
+  }
+
+  function ledger(cx,y){ return svgEl("line",{x1:cx-RX*1.7,y1:y,x2:cx+RX*1.7,y2:y,stroke:"var(--stave)","stroke-width":1}); }
+  function flag(sx,y,up){
+    var dir=up?1:-1;
+    var p="M "+sx+" "+y+" q "+(LS*0.9)+" "+(dir*LS*0.7)+" "+(LS*0.55)+" "+(dir*LS*2.0)+
+          " q "+(LS*0.15)+" "+(-dir*LS*0.9)+" "+(-LS*0.55)+" "+(-dir*LS*1.5) + " Z";
+    return svgEl("path",{d:p,fill:"var(--ink)"});
+  }
+
+  // ---------- key info bar ----------
+  function updateKeyBar(key,stats){
+    document.getElementById("kname").textContent=key.display;
+    var chips=document.getElementById("kchips");
+    var letters=keyLetters(key);
+    if(letters.length===0){ chips.innerHTML='<span class="chip none">no sharps or flats</span>'; }
+    else {
+      var cls=key.t==="s"?"s":"f", sym=key.t==="s"?"♯":"♭";
+      chips.innerHTML=letters.map(function(l){return '<span class="chip '+cls+'">'+l+sym+'</span>';}).join("");
+    }
+    var say=document.getElementById("ksay");
+    if(letters.length===0){ say.innerHTML="Nothing is altered — every note plays as written."; }
+    else {
+      var word=key.t==="s"?"sharp":"flat", sym2=key.t==="s"?"♯":"♭";
+      var list=letters.map(function(l){return "<b>every "+l+" is "+l+sym2+"</b>";});
+      var joined = list.length===1?list[0] : list.slice(0,-1).join(", ")+" and "+list[list.length-1];
+      say.innerHTML="In this key, "+joined+".";
+    }
+    document.getElementById("kstat").innerHTML=
+      stats.implied>0?("<b>"+stats.implied+"</b> note"+(stats.implied===1?"":"s")+" altered by the key"):"";
+  }
+
+  // ---------- wire up ----------
+  var TUNES=[
+    {name:"Ode to Joy — D major (F♯, C♯)", abc:
+"X:1\nT:Ode to Joy\nM:4/4\nL:1/4\nK:D\nFFGA AGFE|DDEF F/E/E2|FFGA AGFE|DDEF E/D/D2|\nEEFD EF/G/FD|EF/G/FE DAF2|FFGA AGFE|DDEF E/D/D2|"},
+    {name:"Twinkle, Twinkle — F major (B♭)", abc:
+"X:1\nT:Twinkle, Twinkle, Little Star\nM:4/4\nL:1/4\nK:F\nFFcc ddc2|BBAA GGF2|ccBB AAG2|ccBB AAG2|FFcc ddc2|BBAA GGF2|"},
+    {name:"A-major scale — every black key (F♯ C♯ G♯)", abc:
+"X:1\nT:A major, up and down\nM:4/4\nL:1/4\nK:A\nA B c d|e f g a|a g f e|d c B A|"},
+    {name:"E♭-major scale — three flats (B♭ E♭ A♭)", abc:
+"X:1\nT:E flat major, up and down\nM:4/4\nL:1/4\nK:Eb\nE F G A|B c d e|e d c B|A G F E|"},
+    {name:"Naturals at work — G major with an F♮", abc:
+"X:1\nT:When a natural cancels the key\nM:4/4\nL:1/4\nK:G\nG A B c|d =F G2|G F G A|G2 D2|"}
+  ];
+
+  var tuneSel=document.getElementById("tuneSel");
+  TUNES.forEach(function(t,idx){ var o=document.createElement("option"); o.value=idx; o.textContent=t.name; tuneSel.appendChild(o); });
+  var custom=document.createElement("option"); custom.value="custom"; custom.textContent="— your own (edit below) —"; tuneSel.appendChild(custom);
+
+  var abcEl=document.getElementById("abc");
+  var keyInput=document.getElementById("keyInput");
+  var tgBadge=document.getElementById("tgBadge");
+  var tgColorAll=document.getElementById("tgColorAll");
+  var titleline=document.getElementById("titleline");
+  var parseMsg=document.getElementById("parseMsg");
+  var keyDirty=false, tuneDirtyGuard=false;
+
+  function currentOpts(){ return {badge:tgBadge.checked, colorAll:tgColorAll.checked}; }
+
+  function refresh(useKeyOverride){
+    var tune=parseTune(abcEl.value);
+    if(useKeyOverride && keyInput.value.trim()!==""){ tune.key=parseKey(keyInput.value); }
+    else { keyInput.value=tune.key.display.replace(" major","").replace(" minor","m"); }
+    var stats=annotate(tune.elements,tune.key);
+    render(tune,currentOpts());
+    updateKeyBar(tune.key,stats);
+    titleline.innerHTML= tune.title? '<span class="tt">'+esc(tune.title)+'</span>'+(tune.meter?'<span class="mm">'+esc(tune.meter)+'</span>':'') : '';
+    parseMsg.textContent = tune.elements.length===0 ? "No notes found yet — pick a tune or type some, e.g.  K:D  then  D E F G A B c d" : "";
+  }
+
+  function loadTune(idx){
+    if(idx==="custom") return;
+    abcEl.value=TUNES[+idx].abc;
+    keyInput.value=""; keyDirty=false;
+    refresh(false);
+  }
+
+  tuneSel.addEventListener("change",function(){ loadTune(tuneSel.value); });
+  var t;
+  abcEl.addEventListener("input",function(){
+    tuneSel.value="custom";
+    clearTimeout(t); t=setTimeout(function(){ refresh(keyDirty); },160);
+  });
+  keyInput.addEventListener("input",function(){ keyDirty=true; clearTimeout(t); t=setTimeout(function(){ refresh(true); },160); });
+  tgBadge.addEventListener("change",function(){ refresh(keyDirty); });
+  tgColorAll.addEventListener("change",function(){ refresh(keyDirty); });
+
+  // init
+  tuneSel.value="0";
+  loadTune(0);
+})();
+</script>
+</body>
+</html>
