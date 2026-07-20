@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sharps &amp; Flats — a Key Signature Trainer</title>
+<style>
+  :root {
+    --paper:   #F4F1EB;
+    --panel:   #FBFAF6;
+    --panel-2: #EFEBE1;
+    --ink:     #1B1B20;
+    --muted:   #6C6A62;
+    --line:    #E1DBCF;
+    --sharp:   #2F6BAE;
+    --sharp-bg:#DEEAF6;
+    --flat:    #B0662A;
+    --flat-bg: #F3E6D4;
+    --brass:   #9A7A32;
+    --white-key:#FCFBF8;
+    --black-key:#26262B;
+    --shadow: 0 1px 2px rgba(30,25,15,.06), 0 8px 24px rgba(30,25,15,.06);
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:#151519; --panel:#1E1E23; --panel-2:#26262C;
+      --ink:#ECEAE1; --muted:#9D9B90; --line:#2F2F36;
+      --sharp:#77ADE4; --sharp-bg:#1C3350; --flat:#E1A25E; --flat-bg:#43331F;
+      --brass:#D3AC5B; --white-key:#E9E6DE; --black-key:#131317;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper:#F4F1EB; --panel:#FBFAF6; --panel-2:#EFEBE1;
+    --ink:#1B1B20; --muted:#6C6A62; --line:#E1DBCF;
+    --sharp:#2F6BAE; --sharp-bg:#DEEAF6; --flat:#B0662A; --flat-bg:#F3E6D4;
+    --brass:#9A7A32; --white-key:#FCFBF8; --black-key:#26262B;
+    --shadow: 0 1px 2px rgba(30,25,15,.06), 0 8px 24px rgba(30,25,15,.06);
+  }
+  :root[data-theme="dark"] {
+    --paper:#151519; --panel:#1E1E23; --panel-2:#26262C;
+    --ink:#ECEAE1; --muted:#9D9B90; --line:#2F2F36;
+    --sharp:#77ADE4; --sharp-bg:#1C3350; --flat:#E1A25E; --flat-bg:#43331F;
+    --brass:#D3AC5B; --white-key:#E9E6DE; --black-key:#131317;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: clamp(20px, 4vw, 56px) clamp(16px,4vw,32px) 72px; }
+
+  /* Header */
+  header .eyebrow {
+    font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--brass); font-weight: 600; margin: 0 0 10px;
+  }
+  header h1 {
+    font-family: var(--serif); font-weight: 600;
+    font-size: clamp(30px, 5.5vw, 50px); line-height: 1.05;
+    margin: 0 0 14px; text-wrap: balance; letter-spacing: -0.01em;
+  }
+  header h1 .s { color: var(--sharp); }
+  header h1 .f { color: var(--flat); }
+  header p.lede {
+    margin: 0; max-width: 60ch; color: var(--muted);
+    font-size: clamp(15px, 2vw, 17px);
+  }
+
+  section { margin-top: clamp(34px, 6vw, 56px); }
+  .sec-title {
+    font-family: var(--serif); font-size: 22px; font-weight: 600;
+    margin: 0 0 4px; display:flex; align-items:baseline; gap:12px;
+  }
+  .sec-title .num {
+    font-family: var(--mono); font-size: 12px; color: var(--brass);
+    border:1px solid var(--line); border-radius: 999px; padding: 2px 9px;
+    font-weight: 600;
+  }
+  .sec-sub { margin: 0 0 22px; color: var(--muted); font-size: 14.5px; max-width: 62ch; }
+
+  /* Trainer layout */
+  .trainer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 28px; align-items: start; }
+  @media (max-width: 720px){ .trainer { grid-template-columns: 1fr; } }
+
+  /* Circle of fifths */
+  .circle-card { background: var(--panel); border:1px solid var(--line); border-radius: 18px; padding: 18px; box-shadow: var(--shadow); }
+  .circle { position: relative; width: 100%; aspect-ratio: 1; max-width: 380px; margin: 4px auto; }
+  .ckey {
+    position: absolute; width: 17%; aspect-ratio: 1; border-radius: 50%;
+    transform: translate(-50%, -50%);
+    border: 1.5px solid var(--line); background: var(--panel-2); color: var(--ink);
+    font-family: var(--serif); font-size: clamp(13px, 2.6vw, 17px); font-weight: 600;
+    cursor: pointer; display:flex; align-items:center; justify-content:center;
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+    padding:0; line-height:1;
+  }
+  .ckey.sharp { border-color: color-mix(in srgb, var(--sharp) 35%, var(--line)); }
+  .ckey.flat  { border-color: color-mix(in srgb, var(--flat) 35%, var(--line)); }
+  .ckey:hover { transform: translate(-50%,-50%) scale(1.08); box-shadow: var(--shadow); }
+  .ckey:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+  .ckey.active { background: var(--brass); border-color: var(--brass); color: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--brass) 30%, transparent); }
+  @media (prefers-color-scheme: dark){ .ckey.active { color:#1a1508; } }
+  :root[data-theme="dark"] .ckey.active { color:#1a1508; }
+  :root[data-theme="light"] .ckey.active { color:#fff; }
+  .circle-hub {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width: 40%; aspect-ratio:1; border-radius:50%; background: var(--panel);
+    border:1px dashed var(--line); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; gap:2px;
+  }
+  .circle-hub .lbl { font-size: 10px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  .circle-hub .big { font-family: var(--serif); font-size: clamp(26px,7vw,40px); font-weight:600; line-height:1; }
+  .circle-legend { display:flex; justify-content:center; gap:18px; margin-top:10px; font-size:12.5px; color:var(--muted); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .dot.s { background: var(--sharp); } .dot.f { background: var(--flat); }
+
+  /* Detail panel */
+  .detail { background: var(--panel); border:1px solid var(--line); border-radius: 18px; padding: 22px; box-shadow: var(--shadow); }
+  .detail .keyname { font-family: var(--serif); font-size: 34px; font-weight:600; margin:0; line-height:1; }
+  .detail .count { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+  .enh-toggle { display:inline-flex; margin-top:14px; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .enh-toggle button { border:0; background:transparent; color:var(--muted); font-family:var(--mono); font-size:12.5px; padding:5px 12px; cursor:pointer; }
+  .enh-toggle button.on { background: var(--brass); color:#fff; }
+
+  .accidentals { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 4px; min-height: 40px; }
+  .chip {
+    font-family: var(--mono); font-size: 15px; font-weight:600;
+    padding: 7px 11px; border-radius: 9px; border:1px solid transparent;
+  }
+  .chip.s { background: var(--sharp-bg); color: var(--sharp); border-color: color-mix(in srgb,var(--sharp) 30%, transparent); }
+  .chip.f { background: var(--flat-bg); color: var(--flat); border-color: color-mix(in srgb,var(--flat) 30%, transparent); }
+  .chip.none { background: var(--panel-2); color: var(--muted); font-family: var(--sans); }
+  .trick-note { font-size: 13px; color: var(--muted); margin: 10px 0 0; border-left: 2px solid var(--brass); padding-left: 12px; }
+  .trick-note b { color: var(--ink); font-weight:600; }
+
+  /* Keyboard */
+  .kb-label { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin: 22px 0 8px; }
+  .keyboard { position: relative; display:flex; height: 130px; user-select:none;
+    border-radius: 0 0 8px 8px; overflow:hidden; box-shadow: var(--shadow); }
+  .wkey { flex:1; background: var(--white-key); border-right:1px solid var(--line);
+    position:relative; display:flex; align-items:flex-end; justify-content:center; padding-bottom:7px; }
+  .wkey:last-child { border-right:0; }
+  .wkey .nm, .bkey .nm { font-family: var(--mono); font-size: 10.5px; opacity:0; transition:opacity .1s; }
+  .wkey.in .nm { opacity:.55; color:#333; }
+  .bkey { position:absolute; top:0; width: 5.9%; height: 62%; background: var(--black-key);
+    border-radius: 0 0 4px 4px; z-index:2; display:flex; align-items:flex-end; justify-content:center; padding-bottom:5px; }
+  .bkey .nm { color:#eee; }
+  .bkey.in .nm { opacity:.85; }
+  /* highlight states */
+  .wkey.scale { background: color-mix(in srgb, var(--brass) 14%, var(--white-key)); }
+  .bkey.scale.s { background: var(--sharp); }
+  .bkey.scale.f { background: var(--flat); }
+  .wkey.tonic { background: color-mix(in srgb, var(--brass) 40%, var(--white-key)); box-shadow: inset 0 -4px 0 var(--brass); }
+  .bkey.tonic { box-shadow: inset 0 -4px 0 var(--brass); outline: 2px solid var(--brass); }
+  .wkey.tonic .nm { opacity:1; color: var(--ink); font-weight:700; }
+
+  /* Reference cards */
+  .cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px,1fr)); gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px 18px 20px; box-shadow:var(--shadow); }
+  .card h3 { font-family:var(--serif); font-size:16px; margin:0 0 4px; }
+  .card .mnem { font-family:var(--mono); font-size:13px; margin:10px 0 0; }
+  .card p { font-size:13.5px; color:var(--muted); margin:8px 0 0; }
+  .letters { display:flex; gap:5px; flex-wrap:wrap; margin-top:8px; }
+  .letters span { font-family:var(--serif); font-weight:600; font-size:18px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:6px; }
+  .letters.s span { color:var(--sharp); background:var(--sharp-bg); }
+  .letters.f span { color:var(--flat); background:var(--flat-bg); }
+  .card b { color: var(--ink); font-weight:600; }
+
+  /* Quiz */
+  .quiz { background: var(--panel); border:1px solid var(--line); border-radius:18px; padding:24px; box-shadow:var(--shadow); text-align:center; }
+  .quiz .q { font-family: var(--serif); font-size: clamp(20px,3.5vw,26px); margin: 4px 0 4px; }
+  .quiz .q .k { color: var(--brass); }
+  .quiz .prompt { color:var(--muted); font-size:14px; margin:0 0 18px; }
+  .quiz-answer { min-height: 56px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+  .quiz-answer .chips { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+  .btnrow { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px; }
+  button.btn {
+    font-family: var(--sans); font-size:14px; font-weight:600; cursor:pointer;
+    border-radius:10px; padding:10px 18px; border:1px solid var(--line);
+    background: var(--panel-2); color: var(--ink); transition: background .12s, transform .06s;
+  }
+  button.btn:hover { background: color-mix(in srgb, var(--brass) 14%, var(--panel-2)); }
+  button.btn:active { transform: translateY(1px); }
+  button.btn.primary { background: var(--brass); color:#fff; border-color:var(--brass); }
+  button.btn:focus-visible { outline:2px solid var(--brass); outline-offset:2px; }
+  .score { font-family:var(--mono); font-size:13px; color:var(--muted); margin-top:16px; }
+  .score b { color: var(--ink); }
+  .reveal-hint { font-size:13px; color:var(--muted); }
+
+  footer { margin-top:56px; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px; text-align:center; }
+
+  @media (prefers-reduced-motion: reduce){ * { transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Piano · Key Signatures</p>
+    <h1>Never guess a <span class="s">sharp</span> or <span class="f">flat</span> again</h1>
+    <p class="lede">Every major key follows a pattern. Pick a key on the circle of fifths, watch the notes light up on the keyboard, learn the two shortcuts that name any key from its signature — then drill it until it's automatic.</p>
+  </header>
+
+  <section aria-labelledby="t1">
+    <h2 class="sec-title" id="t1"><span class="num">01</span> Explore any key</h2>
+    <p class="sec-sub">Clockwise from the top adds one sharp at a time; counter-clockwise adds one flat. Click a key to see its signature and scale.</p>
+    <div class="trainer">
+      <div class="circle-card">
+        <div class="circle" id="circle" role="group" aria-label="Circle of fifths"></div>
+        <div class="circle-legend">
+          <span><span class="dot s"></span>sharp keys →</span>
+          <span><span class="dot f"></span>← flat keys</span>
+        </div>
+      </div>
+
+      <div class="detail" id="detail">
+        <h3 class="keyname" id="keyname">C major</h3>
+        <p class="count" id="count">No sharps, no flats — all white keys.</p>
+        <div id="enhWrap"></div>
+        <div class="accidentals" id="accidentals"></div>
+        <p class="trick-note" id="trick"></p>
+
+        <p class="kb-label">The scale on the keyboard — <span style="color:var(--brass)">◆</span> tonic</p>
+        <div class="keyboard" id="keyboard" aria-hidden="true"></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="t2">
+    <h2 class="sec-title" id="t2"><span class="num">02</span> The tricks worth memorizing</h2>
+    <p class="sec-sub">Four small facts cover all fifteen major keys.</p>
+    <div class="cards">
+      <div class="card">
+        <h3>Order of sharps</h3>
+        <div class="letters s"><span>F</span><span>C</span><span>G</span><span>D</span><span>A</span><span>E</span><span>B</span></div>
+        <p class="mnem"><b>Father Charles Goes Down And Ends Battle</b></p>
+        <p>Sharps are always added in this order. One sharp? It's F♯. Two? F♯ and C♯. And so on.</p>
+      </div>
+      <div class="card">
+        <h3>Order of flats</h3>
+        <div class="letters f"><span>B</span><span>E</span><span>A</span><span>D</span><span>G</span><span>C</span><span>F</span></div>
+        <p class="mnem"><b>Battle Ends And Down Goes Charles' Father</b></p>
+        <p>The exact reverse of the sharps. One flat? B♭. Two? B♭ and E♭.</p>
+      </div>
+      <div class="card">
+        <h3>Name a sharp key</h3>
+        <p>Take the <b>last sharp</b> and go up one half-step — that's your key.</p>
+        <p class="mnem">last sharp F♯ → <b>G major</b><br>last sharp G♯ → <b>A major</b></p>
+      </div>
+      <div class="card">
+        <h3>Name a flat key</h3>
+        <p>The <b>second-to-last flat</b> is the name of the key.</p>
+        <p class="mnem">B♭ E♭ <b>A♭</b> D♭ → key of A♭<br><span style="color:var(--muted)">(F major, one flat, is the exception — just know it.)</span></p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="t3">
+    <h2 class="sec-title" id="t3"><span class="num">03</span> Drill it</h2>
+    <p class="sec-sub">Answer in your head, then reveal. A few minutes a day is all it takes to make this reflexive.</p>
+    <div class="quiz">
+      <p class="prompt" id="quizPrompt">How many sharps or flats?</p>
+      <p class="q"><span class="k" id="quizKey">G major</span></p>
+      <div class="quiz-answer" id="quizAnswer"><span class="reveal-hint">Think it through, then reveal the answer.</span></div>
+      <div class="btnrow">
+        <button class="btn primary" id="revealBtn">Reveal</button>
+        <button class="btn" id="gotIt" hidden>Got it ✓</button>
+        <button class="btn" id="missed" hidden>Missed it</button>
+        <button class="btn" id="nextBtn" hidden>Next →</button>
+      </div>
+      <p class="score">Streak <b id="streak">0</b> · Correct <b id="correct">0</b>/<b id="total">0</b></p>
+    </div>
+  </section>
+
+  <footer>
+    Ebony &amp; ivory · a small trainer for remembering sharps and flats.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // Pitch classes: C=0 ... B=11
+  var SHARP_ORDER = ["F","C","G","D","A","E","B"];
+  var FLAT_ORDER  = ["B","E","A","D","G","C","F"];
+
+  function sharpsList(n){ return SHARP_ORDER.slice(0,n).map(function(x){return x+"♯";}); }
+  function flatsList(n){ return FLAT_ORDER.slice(0,n).map(function(x){return x+"♭";}); }
+
+  // pos = clock position (0=top, clockwise). tonic = pitch class.
+  var KEYS = [
+    {label:"C",  name:"C major",  pos:0,  tonic:0,  type:"natural", n:0},
+    {label:"G",  name:"G major",  pos:1,  tonic:7,  type:"sharp",   n:1},
+    {label:"D",  name:"D major",  pos:2,  tonic:2,  type:"sharp",   n:2},
+    {label:"A",  name:"A major",  pos:3,  tonic:9,  type:"sharp",   n:3},
+    {label:"E",  name:"E major",  pos:4,  tonic:4,  type:"sharp",   n:4},
+    {label:"B",  name:"B major",  pos:5,  tonic:11, type:"sharp",   n:5},
+    {label:"G♭/F♯", name:"G♭ major", pos:6, tonic:6, type:"enh", n:6},
+    {label:"D♭", name:"D♭ major", pos:7,  tonic:1,  type:"flat", n:5},
+    {label:"A♭", name:"A♭ major", pos:8,  tonic:8,  type:"flat", n:4},
+    {label:"E♭", name:"E♭ major", pos:9,  tonic:3,  type:"flat", n:3},
+    {label:"B♭", name:"B♭ major", pos:10, tonic:10, type:"flat", n:2},
+    {label:"F",  name:"F major",  pos:11, tonic:5,  type:"flat", n:1}
+  ];
+
+  var MAJOR = [0,2,4,5,7,9,11];
+  function scalePcs(tonic){ return MAJOR.map(function(iv){ return (tonic+iv)%12; }); }
+
+  // ---------- Circle of fifths ----------
+  var circle = document.getElementById("circle");
+  var selectedPos = 0;
+  var enh = "flat"; // for pos 6: 'flat' (Gb) or 'sharp' (F#)
+
+  KEYS.forEach(function(k){
+    var angle = k.pos * 30 * Math.PI/180;
+    var R = 41; // percent radius
+    var x = 50 + R * Math.sin(angle);
+    var y = 50 - R * Math.cos(angle);
+    var b = document.createElement("button");
+    b.className = "ckey " + (k.type==="sharp"?"sharp":k.type==="flat"?"flat":"");
+    b.style.left = x + "%";
+    b.style.top = y + "%";
+    b.textContent = k.label;
+    b.setAttribute("aria-label", k.name);
+    b.dataset.pos = k.pos;
+    b.addEventListener("click", function(){ select(k.pos); });
+    circle.appendChild(b);
+  });
+
+  function keyByPos(pos){ for(var i=0;i<KEYS.length;i++){ if(KEYS[i].pos===pos) return KEYS[i]; } }
+
+  function select(pos){
+    selectedPos = pos;
+    var btns = circle.querySelectorAll(".ckey");
+    btns.forEach(function(b){ b.classList.toggle("active", +b.dataset.pos===pos); });
+    render();
+  }
+
+  // ---------- Render detail ----------
+  var elName = document.getElementById("keyname");
+  var elCount = document.getElementById("count");
+  var elAcc = document.getElementById("accidentals");
+  var elTrick = document.getElementById("trick");
+  var elEnh = document.getElementById("enhWrap");
+  var hubBig = null;
+
+  function currentKeyData(){
+    var k = keyByPos(selectedPos);
+    if(k.type==="enh"){
+      if(enh==="sharp"){
+        return { name:"F♯ major", tonic:6, type:"sharp", n:6, isEnh:true };
+      }
+      return { name:"G♭ major", tonic:6, type:"flat", n:6, isEnh:true };
+    }
+    return { name:k.name, tonic:k.tonic, type:k.type, n:k.n, isEnh:false };
+  }
+
+  function render(){
+    var d = currentKeyData();
+    elName.textContent = d.name;
+
+    // enharmonic toggle
+    if(d.isEnh){
+      elEnh.innerHTML =
+        '<div class="enh-toggle" role="group" aria-label="Enharmonic spelling">' +
+        '<button data-e="flat" class="'+(enh==="flat"?"on":"")+'">G♭ · 6 flats</button>' +
+        '<button data-e="sharp" class="'+(enh==="sharp"?"on":"")+'">F♯ · 6 sharps</button>' +
+        '</div>';
+      elEnh.querySelectorAll("button").forEach(function(b){
+        b.addEventListener("click", function(){ enh=b.dataset.e; render(); });
+      });
+    } else {
+      elEnh.innerHTML = "";
+    }
+
+    // count + accidentals
+    var acc = [];
+    if(d.type==="natural"){
+      elCount.textContent = "No sharps, no flats — all white keys.";
+      elAcc.innerHTML = '<span class="chip none">natural key</span>';
+      elTrick.innerHTML = "The home base. Everything else is measured from here.";
+    } else if(d.type==="sharp"){
+      acc = sharpsList(d.n);
+      elCount.textContent = d.n + (d.n===1?" sharp":" sharps");
+      elAcc.innerHTML = acc.map(function(a){ return '<span class="chip s">'+a+'</span>'; }).join("");
+      var last = acc[acc.length-1];
+      elTrick.innerHTML = 'Trick: the last sharp is <b>'+last+'</b> — up one half-step is <b>'+d.name+'</b>.';
+    } else {
+      acc = flatsList(d.n);
+      elCount.textContent = d.n + (d.n===1?" flat":" flats");
+      elAcc.innerHTML = acc.map(function(a){ return '<span class="chip f">'+a+'</span>'; }).join("");
+      if(d.n===1){
+        elTrick.innerHTML = 'One flat is <b>B♭</b> — that’s always <b>F major</b> (the flat-key exception to memorize).';
+      } else {
+        var second = acc[acc.length-2];
+        elTrick.innerHTML = 'Trick: the second-to-last flat is <b>'+second+'</b> — that names the key, <b>'+d.name+'</b>.';
+      }
+    }
+
+    // hub
+    var hub = document.getElementById("hub-big");
+    if(hub){ hub.textContent = d.name.replace(" major",""); }
+    var hubSub = document.getElementById("hub-sub");
+    if(hubSub){
+      hubSub.textContent = d.type==="natural" ? "0 accidentals" :
+        (d.n + (d.type==="sharp" ? (d.n===1?" sharp":" sharps") : (d.n===1?" flat":" flats")));
+    }
+
+    renderKeyboard(d);
+  }
+
+  // ---------- Hub ----------
+  (function buildHub(){
+    var hub = document.createElement("div");
+    hub.className = "circle-hub";
+    hub.innerHTML = '<span class="lbl">key of</span>' +
+      '<span class="big" id="hub-big">C</span>' +
+      '<span class="lbl" id="hub-sub">0 accidentals</span>';
+    circle.appendChild(hub);
+  })();
+
+  // ---------- Keyboard ----------
+  var keyboard = document.getElementById("keyboard");
+  // Two octaves starting at C. white keys and black-key offsets.
+  var WHITE = [0,2,4,5,7,9,11]; // pcs of white keys within an octave (C D E F G A B)
+  var WHITE_NAMES = ["C","D","E","F","G","A","B"];
+  // black key after white index: has black? C(0)->C# yes, D(1)->D# yes, E(2)->no, F(3)->F# yes, G(4)->G# yes, A(5)->A# yes, B(6)->no
+  var BLACK_AFTER = [1,1,0,1,1,1,0];
+  var BLACK_PC = {0:1,1:3,3:6,4:8,5:10};
+
+  function renderKeyboard(d){
+    keyboard.innerHTML = "";
+    var octaves = 2;
+    var scale = scalePcs(d.tonic);
+    var totalWhite = octaves*7;
+    // build white keys
+    for(var o=0;o<octaves;o++){
+      for(var w=0; w<7; w++){
+        var pc = WHITE[w];
+        var wk = document.createElement("div");
+        wk.className = "wkey";
+        if(scale.indexOf(pc)>=0) wk.classList.add("scale","in");
+        if(pc===d.tonic) wk.classList.add("tonic");
+        var nm = document.createElement("span");
+        nm.className="nm"; nm.textContent = WHITE_NAMES[w];
+        wk.appendChild(nm);
+        keyboard.appendChild(wk);
+      }
+    }
+    // build black keys, positioned over white keys
+    var whiteWidthPct = 100/totalWhite;
+    for(var o2=0;o2<octaves;o2++){
+      for(var w2=0; w2<7; w2++){
+        if(!BLACK_AFTER[w2]) continue;
+        var whiteIndex = o2*7 + w2;
+        var pc2 = BLACK_PC[w2]; // pitch class of the black key after this white key
+        var bk = document.createElement("div");
+        bk.className = "bkey";
+        var inScale = scale.indexOf(pc2)>=0;
+        if(inScale){
+          bk.classList.add("scale","in");
+          bk.classList.add(d.type==="flat"?"f":"s");
+        }
+        if(pc2===d.tonic){ bk.classList.add("tonic","in"); }
+        // center between this white key's right edge
+        var leftPct = (whiteIndex+1)*whiteWidthPct - (5.9/2);
+        bk.style.left = leftPct + "%";
+        keyboard.appendChild(bk);
+      }
+    }
+  }
+
+  // ---------- Quiz ----------
+  var quizKeyEl = document.getElementById("quizKey");
+  var quizPromptEl = document.getElementById("quizPrompt");
+  var quizAnswerEl = document.getElementById("quizAnswer");
+  var revealBtn = document.getElementById("revealBtn");
+  var gotIt = document.getElementById("gotIt");
+  var missed = document.getElementById("missed");
+  var nextBtn = document.getElementById("nextBtn");
+  var streakEl = document.getElementById("streak");
+  var correctEl = document.getElementById("correct");
+  var totalEl = document.getElementById("total");
+
+  var QUIZ_KEYS = KEYS.filter(function(k){ return k.type!=="enh"; }); // 11 unambiguous keys
+  var curQuiz = null, curMode = "count", answered=false;
+  var streak=0, correct=0, total=0;
+
+  function newQuestion(){
+    answered=false;
+    curQuiz = QUIZ_KEYS[Math.floor(Math.random()*QUIZ_KEYS.length)];
+    curMode = Math.random()<0.5 ? "count" : "names";
+    quizKeyEl.textContent = curQuiz.name;
+    quizPromptEl.textContent = curMode==="count"
+      ? "How many sharps or flats does it have?"
+      : "Name the sharps or flats.";
+    quizAnswerEl.innerHTML = '<span class="reveal-hint">Think it through, then reveal the answer.</span>';
+    revealBtn.hidden=false; gotIt.hidden=true; missed.hidden=true; nextBtn.hidden=true;
+  }
+
+  function answerFor(k){
+    if(k.type==="natural") return { text:"No sharps or flats", chips:[] , none:true};
+    if(k.type==="sharp"){
+      var a=sharpsList(k.n);
+      return { text:k.n+(k.n===1?" sharp":" sharps"), chips:a, cls:"s" };
+    }
+    var f=flatsList(k.n);
+    return { text:k.n+(k.n===1?" flat":" flats"), chips:f, cls:"f" };
+  }
+
+  function reveal(){
+    var a = answerFor(curQuiz);
+    var html = "";
+    if(curMode==="count"){
+      html = '<div style="font-family:var(--serif);font-size:22px">'+a.text+'</div>';
+      if(a.chips.length){
+        html += '<div class="chips">'+a.chips.map(function(c){return '<span class="chip '+a.cls+'">'+c+'</span>';}).join("")+'</div>';
+      }
+    } else {
+      if(a.none){ html = '<div style="font-family:var(--serif);font-size:22px">None — all white keys</div>'; }
+      else {
+        html = '<div class="chips">'+a.chips.map(function(c){return '<span class="chip '+a.cls+'">'+c+'</span>';}).join("")+'</div>';
+        html += '<div style="color:var(--muted);font-size:13px">('+a.text+')</div>';
+      }
+    }
+    quizAnswerEl.innerHTML = html;
+    revealBtn.hidden=true; gotIt.hidden=false; missed.hidden=false; nextBtn.hidden=false;
+  }
+
+  function score(ok){
+    if(answered) return;
+    answered=true;
+    total++;
+    if(ok){ correct++; streak++; } else { streak=0; }
+    streakEl.textContent=streak; correctEl.textContent=correct; totalEl.textContent=total;
+    gotIt.hidden=true; missed.hidden=true;
+  }
+
+  revealBtn.addEventListener("click", reveal);
+  gotIt.addEventListener("click", function(){ score(true); });
+  missed.addEventListener("click", function(){ score(false); });
+  nextBtn.addEventListener("click", newQuestion);
+
+  // init
+  select(0);
+  newQuestion();
+})();
+</script>
+</body>
+</html>
